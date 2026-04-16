@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>6М класс · МАОУ СОШ №13 с УИОП</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link rel="stylesheet" href="static/css/styles.css">
+</head>
+<body>
+<div class="app-wrapper">
+  <!-- Шапка -->
+  <div class="header">
+    <div class="title-section">
+      <h1>6М класс</h1>
+      <span class="badge"><i class="fas fa-school"></i> МАОУ СОШ №13 с УИОП</span>
+    </div>
+    <div class="admin-control">
+      <button class="btn" id="adminLoginBtn"><i class="fas fa-lock"></i> Вход для админа</button>
+      <button class="btn btn-outline hidden" id="adminLogoutBtn"><i class="fas fa-sign-out-alt"></i> Выйти</button>
+      <span id="adminBadge" style="display:none;"><i class="fas fa-check-circle"></i> Админ</span>
+    </div>
+  </div>
+
+  <!-- Навигация -->
+  <div class="nav-tabs">
+    <button class="tab-btn active" data-tab="home"><i class="fas fa-home"></i> Главная</button>
+    <button class="tab-btn" data-tab="about"><i class="fas fa-info-circle"></i> О классе</button>
+    <button class="tab-btn" data-tab="students"><i class="fas fa-users"></i> Ученики</button>
+    <button class="tab-btn" data-tab="events"><i class="fas fa-calendar-alt"></i> Мероприятия</button>
+    <button class="tab-btn" data-tab="tests"><i class="fas fa-pencil-alt"></i> Контрольные</button>
+    <button class="tab-btn" data-tab="gallery"><i class="fas fa-images"></i> Фото</button>
+  </div>
+
+  <!-- Контейнер контента -->
+  <div id="contentArea" class="fade-transition"></div>
+
+  <!-- Системные уведомления -->
+  <div id="toast" class="toast hidden"></div>
+</div>
+
+<!-- Модальное окно ученика -->
+<div class="modal" id="studentModal">
+  <div class="modal-card">
+    <img id="modalAvatar" src="" alt="">
+    <h2 id="modalName"></h2>
+    <p id="modalDesc"></p>
+    <div id="modalAdminActions"></div>
+    <button class="btn" onclick="window.closeModal()">Закрыть</button>
+  </div>
+</div>
+
+<!-- Модальное окно импорта/экспорта -->
+<div class="modal" id="dataModal">
+  <div class="modal-card">
+    <h3>Управление данными</h3>
+    <button class="btn" id="exportDataBtn"><i class="fas fa-download"></i> Скачать резервную копию</button>
+    <div style="margin: 20px 0;">
+      <label class="btn"><i class="fas fa-upload"></i> Восстановить из файла
+        <input type="file" id="importFileInput" accept=".json,application/json" style="display:none;">
+      </label>
+    </div>
+    <button class="btn" onclick="window.closeDataModal()">Закрыть</button>
+  </div>
+</div>
+
+<!-- Модальное окно для просмотра фото (лайтбокс) -->
+<div class="modal" id="lightboxModal">
+  <div class="lightbox-content">
+    <span class="close-lightbox" onclick="window.closeLightbox()">&times;</span>
+    <img id="lightboxImage" src="" alt="Просмотр фото">
+  </div>
+</div>
+
+<script src="static/js/config.js"></script>
+<script src="static/js/script.js"></script>
+</body>
+</html>
