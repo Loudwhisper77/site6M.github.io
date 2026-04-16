@@ -7,12 +7,15 @@
     ? window.ADMIN_PASSWORD_HASH 
     : null;
   
-  // Ключ для хранения хеша в localStorage (на случай отсутствия config.js)
   const LOCAL_HASH_KEY = 'classSiteAdminHash';
   const STORAGE_KEY = 'classSiteData_v2';
+  const DATA_URL = 'data.json'; // файл с данными в корне репозитория
 
   // ---------- СОСТОЯНИЕ ----------
   let isAdmin = false;
+  let dataLoadedFromServer = false; // флаг, загружены ли данные с сервера
+
+  // Стартовая заглушка (будет перезаписана при загрузке)
   let appData = {
     students: [],
     news: [],
@@ -20,35 +23,91 @@
     tests: [],
     photos: [],
     about: {
-      teacher: 'Елена Викторовна Смирнова',
-      studentsCount: '27',
-      profile: 'математический',
-      motto: '«Вместе мы — сила!»',
-      achievements: [
-        '1 место в школьной спартакиаде 2025',
-        'Победители олимпиады по математике',
-        'Участники городского конкурса чтецов'
-      ]
+      teacher: '',
+      studentsCount: '',
+      profile: '',
+      motto: '',
+      achievements: []
     }
   };
 
-  // Загрузка данных
-  function loadData() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        appData = { ...appData, ...parsed };
-        if (!appData.about) appData.about = { ...appData.about };
-      } catch(e) {
-        console.warn('Ошибка загрузки');
+  // ---------- ЗАГРУЗКА ДАННЫХ ----------
+  async function loadData() {
+    // 1. Пробуем загрузить с сервера (data.json)
+    try {
+      const response = await fetch(DATA_URL);
+      if (response.ok) {
+        const serverData = await response.json();
+        // Объединяем с дефолтными полями about, если их нет
+        appData = {
+          students: serverData.students || [],
+          news: serverData.news || [],
+          events: serverData.events || [],
+          tests: serverData.tests || [],
+          photos: serverData.photos || [],
+          about: { ...appData.about, ...(serverData.about || {}) }
+        };
+        dataLoadedFromServer = true;
+        console.log('✅ Данные загружены с сервера');
+      }
+    } catch (e) {
+      console.warn('⚠️ Не удалось загрузить data.json, используем localStorage');
+    }
+
+    // 2. Если с сервера не загрузили – берём из localStorage
+    if (!dataLoadedFromServer) {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          appData = JSON.parse(saved);
+        } catch(e) {}
       }
     }
-    saveData();
+
+    // 3. Сохраняем в localStorage для резерва и офлайн-доступа
+    saveDataToLocal();
   }
 
-  function saveData() {
+  function saveDataToLocal() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+  }
+
+  // Вызывается после любого изменения данных (добавление/удаление/редактирование)
+  function afterDataChange() {
+    saveDataToLocal();
+    const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab || 'home';
+    renderContent(activeTab);
+    if (dataLoadedFromServer && isAdmin) {
+      showToast('💾 Изменения сохранены локально. Для публикации на сайте экспортируйте данные и замените файл data.json в репозитории.', 6000);
+    } else {
+      showToast('Изменения сохранены', 2000);
+    }
+  }
+
+  // Принудительное обновление данных с сервера (для админа)
+  async function refreshFromServer() {
+    try {
+      const response = await fetch(DATA_URL + '?v=' + Date.now()); // кэш-брейкер
+      if (response.ok) {
+        const serverData = await response.json();
+        appData = {
+          students: serverData.students || [],
+          news: serverData.news || [],
+          events: serverData.events || [],
+          tests: serverData.tests || [],
+          photos: serverData.photos || [],
+          about: { ...appData.about, ...(serverData.about || {}) }
+        };
+        saveDataToLocal();
+        const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab || 'home';
+        renderContent(activeTab);
+        showToast('🔄 Данные обновлены с сервера', 2000);
+      } else {
+        showToast('❌ Не удалось загрузить данные с сервера', 3000);
+      }
+    } catch(e) {
+      showToast('❌ Ошибка соединения', 3000);
+    }
   }
 
   // Утилиты
@@ -124,7 +183,7 @@
             <h2 class="section-title"><i class="fas fa-graduation-cap"></i> Добро пожаловать!</h2>
             <p style="font-size:1.2rem; margin:16px 0 8px;">🎓 МАОУ СОШ №13 с углублённым изучением отдельных предметов</p>
             <p>Дружный, активный 6М класс. Мы учимся, дружим и достигаем новых высот вместе!</p>
-            <div style="margin-top:20px;"><i class="fas fa-map-pin"></i> г. Электросталь, ул. Тевосяна, 23</div>
+            <div style="margin-top:20px;"><i class="fas fa-map-pin"></i> г. Энск, ул. Школьная, 13</div>
           </div>
           <div class="info-card">
             <h3><i class="fas fa-calendar-alt"></i> Ближайшие мероприятия</h3>
@@ -146,8 +205,9 @@
   }
 
   function adminPanel() {
-    return `<div style="display:flex; gap:12px; margin-top:16px;">
+    return `<div style="display:flex; gap:12px; margin-top:16px; flex-wrap:wrap;">
       <button class="btn" onclick="window.showDataModal()"><i class="fas fa-database"></i> Управление данными</button>
+      <button class="btn" onclick="window.refreshFromServer()"><i class="fas fa-sync-alt"></i> Обновить с сервера</button>
     </div>`;
   }
 
@@ -288,7 +348,7 @@
     });
   }
 
-  // ---------- АДМИН-ФУНКЦИИ ----------
+  // ---------- АДМИН-ФУНКЦИИ (редактирование данных) ----------
   window.editAboutPrompt = function() {
     const newTeacher = prompt('Классный руководитель:', appData.about.teacher);
     if (newTeacher) appData.about.teacher = newTeacher;
@@ -300,9 +360,7 @@
     if (newMotto) appData.about.motto = newMotto;
     const newAchievements = prompt('Достижения (через запятую):', appData.about.achievements.join(', '));
     if (newAchievements) appData.about.achievements = newAchievements.split(',').map(s => s.trim());
-    saveData();
-    renderContent('about');
-    showToast('Информация о классе обновлена');
+    afterDataChange();
   };
 
   window.addStudentPrompt = function() {
@@ -318,16 +376,12 @@
         const reader = new FileReader();
         reader.onload = (ev) => {
           appData.students.push({ id: Date.now().toString(), name, desc, photo: ev.target.result });
-          saveData();
-          renderContent('students');
-          showToast('Ученик добавлен');
+          afterDataChange();
         };
         reader.readAsDataURL(file);
       } else {
         appData.students.push({ id: Date.now().toString(), name, desc, photo: 'https://i.pravatar.cc/200?img=7' });
-        saveData();
-        renderContent('students');
-        showToast('Ученик добавлен (без фото)');
+        afterDataChange();
       }
     };
     photoInput.click();
@@ -351,26 +405,21 @@
           const reader = new FileReader();
           reader.onload = (ev) => {
             student.photo = ev.target.result;
-            saveData();
-            renderContent('students');
-            showToast('Фото обновлено');
+            afterDataChange();
           };
           reader.readAsDataURL(file);
         }
       };
       photoInput.click();
     } else {
-      saveData();
-      renderContent('students');
+      afterDataChange();
     }
   };
 
   window.deleteStudentPrompt = function(id) {
     if(confirm('Удалить ученика?')) {
       appData.students = appData.students.filter(s => s.id !== id);
-      saveData();
-      renderContent('students');
-      showToast('Ученик удалён');
+      afterDataChange();
     }
   };
 
@@ -378,17 +427,13 @@
     const text = prompt('Текст новости:');
     if(!text) return;
     appData.news.unshift({ date: new Date().toISOString().slice(0,10), text });
-    saveData();
-    renderContent('home');
-    showToast('Новость добавлена');
+    afterDataChange();
   };
 
   window.deleteNews = function(composite) {
     if(confirm('Удалить новость?')) {
       appData.news = appData.news.filter(n => (n.date+n.text) !== composite);
-      saveData();
-      renderContent('home');
-      showToast('Новость удалена');
+      afterDataChange();
     }
   };
 
@@ -398,18 +443,14 @@
     const desc = prompt('Описание:');
     if(date && title) {
       appData.events.push({date,title,desc});
-      saveData();
-      renderContent('events');
-      showToast('Мероприятие добавлено');
+      afterDataChange();
     }
   };
 
   window.deleteEventPrompt = function(composite) {
     if(confirm('Удалить мероприятие?')) {
       appData.events = appData.events.filter(e => (e.date+e.title) !== composite);
-      saveData();
-      renderContent('events');
-      showToast('Мероприятие удалено');
+      afterDataChange();
     }
   };
 
@@ -419,18 +460,14 @@
     const topic = prompt('Тема:');
     if(date && subject) {
       appData.tests.push({date,subject,topic});
-      saveData();
-      renderContent('tests');
-      showToast('Контрольная добавлена');
+      afterDataChange();
     }
   };
 
   window.deleteTestPrompt = function(composite) {
     if(confirm('Удалить контрольную?')) {
       appData.tests = appData.tests.filter(t => (t.date+t.subject) !== composite);
-      saveData();
-      renderContent('tests');
-      showToast('Контрольная удалена');
+      afterDataChange();
     }
   };
 
@@ -448,9 +485,7 @@
           appData.photos.push(ev.target.result);
           loaded++;
           if(loaded === files.length) {
-            saveData();
-            renderContent('gallery');
-            showToast(`Добавлено фото: ${files.length}`);
+            afterDataChange();
           }
         };
         reader.readAsDataURL(file);
@@ -462,9 +497,7 @@
   window.deletePhoto = function(index) {
     if(confirm('Удалить фото?')) {
       appData.photos.splice(index, 1);
-      saveData();
-      renderContent('gallery');
-      showToast('Фото удалено');
+      afterDataChange();
     }
   };
 
@@ -478,7 +511,7 @@
     a.download = `class-backup-${new Date().toISOString().slice(0,10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast('Резервная копия скачана');
+    showToast('Резервная копия скачана. Замените этим файлом data.json в репозитории.', 5000);
   }
 
   function importData(e) {
@@ -488,11 +521,17 @@
     reader.onload = (ev) => {
       try {
         const imported = JSON.parse(ev.target.result);
-        appData = imported;
-        saveData();
-        renderContent(document.querySelector('.tab-btn.active')?.dataset.tab || 'home');
+        appData = {
+          students: imported.students || [],
+          news: imported.news || [],
+          events: imported.events || [],
+          tests: imported.tests || [],
+          photos: imported.photos || [],
+          about: { ...appData.about, ...(imported.about || {}) }
+        };
+        afterDataChange();
         closeDataModal();
-        showToast('Данные восстановлены');
+        showToast('Данные импортированы. Не забудьте экспортировать и заменить data.json в репозитории.', 5000);
       } catch(ex) {
         alert('Ошибка: неверный формат файла');
       }
@@ -500,20 +539,13 @@
     reader.readAsText(file);
   }
 
-  // ---------- НОВАЯ ЛОГИКА ВХОДА ----------
-  // Установка или получение хеша администратора
+  // ---------- АВТОРИЗАЦИЯ ----------
   async function getAdminHash() {
-    // 1. Если есть config.js — используем его
     if (ADMIN_PASSWORD_HASH) return ADMIN_PASSWORD_HASH;
-
-    // 2. Иначе проверяем localStorage
     let savedHash = localStorage.getItem(LOCAL_HASH_KEY);
     if (savedHash) return savedHash;
-
-    // 3. Если ничего нет — предлагаем установить пароль
     const pass = prompt('🔐 Первый вход. Придумайте пароль администратора:');
     if (!pass) return null;
-
     const newHash = await hashPassword(pass);
     localStorage.setItem(LOCAL_HASH_KEY, newHash);
     showToast('Пароль администратора установлен', 2000);
@@ -526,10 +558,8 @@
       alert('Не удалось установить пароль.');
       return;
     }
-
     const pass = prompt('Введите пароль администратора:');
     if (!pass) return;
-
     const hash = await hashPassword(pass);
     if (hash === currentHash) {
       isAdmin = true;
@@ -542,7 +572,6 @@
     }
   }
 
-  // Возможность сбросить пароль (для администратора)
   window.resetAdminPassword = function() {
     if (!isAdmin) {
       alert('Только администратор может сбросить пароль.');
@@ -551,7 +580,7 @@
     if (confirm('Сбросить пароль администратора? После этого потребуется установить новый.')) {
       localStorage.removeItem(LOCAL_HASH_KEY);
       ADMIN_PASSWORD_HASH = null;
-      alert('Пароль сброшен. При следующем входе вам будет предложено установить новый.');
+      alert('Пароль сброшен.');
     }
   };
 
@@ -583,8 +612,8 @@
   }
 
   // Инициализация
-  function init() {
-    loadData();
+  async function init() {
+    await loadData();
     renderContent('home');
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -593,12 +622,12 @@
     document.getElementById('adminLogoutBtn').addEventListener('click', logoutAdmin);
     document.getElementById('exportDataBtn').addEventListener('click', exportData);
     document.getElementById('importFileInput').addEventListener('change', importData);
-
     document.getElementById('lightboxModal').addEventListener('click', (e) => {
-      if (e.target === document.getElementById('lightboxModal')) {
-        closeLightbox();
-      }
+      if (e.target === document.getElementById('lightboxModal')) closeLightbox();
     });
+
+    // Глобальная функция для кнопки "Обновить с сервера"
+    window.refreshFromServer = refreshFromServer;
   }
 
   init();
