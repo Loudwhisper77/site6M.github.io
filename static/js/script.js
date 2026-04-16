@@ -183,7 +183,7 @@
             <h2 class="section-title"><i class="fas fa-graduation-cap"></i> Добро пожаловать!</h2>
             <p style="font-size:1.2rem; margin:16px 0 8px;">🎓 МАОУ СОШ №13 с углублённым изучением отдельных предметов</p>
             <p>Дружный, активный 6М класс. Мы учимся, дружим и достигаем новых высот вместе!</p>
-            <div style="margin-top:20px;"><i class="fas fa-map-pin"></i> г. Энск, ул. Школьная, 13</div>
+            <div style="margin-top:20px;"><i class="fas fa-map-pin"></i> г. Электросталь, ул. Тевосяна, 23</div>
           </div>
           <div class="info-card">
             <h3><i class="fas fa-calendar-alt"></i> Ближайшие мероприятия</h3>
